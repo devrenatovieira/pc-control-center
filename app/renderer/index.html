@@ -10,7 +10,7 @@
     <main class="shell">
       <aside class="sidebar">
         <div>
-          <p class="eyebrow">MVP Linux</p>
+          <p class="eyebrow">Instalação automática</p>
           <h1>PC Control Center</h1>
         </div>
         <nav class="nav" aria-label="Seções">
@@ -25,7 +25,7 @@
         <section id="welcome" class="screen active">
           <div class="section-heading">
             <p class="eyebrow">Monitoramento remoto</p>
-            <h2>Configure o agente Linux e receba alertas pelo Telegram.</h2>
+            <h2>Configure o Telegram uma vez e deixe o app preparar o agente.</h2>
           </div>
           <div class="info-grid">
             <article class="info-card">
@@ -34,11 +34,11 @@
             </article>
             <article class="info-card">
               <h3>Agente local</h3>
-              <p>O agente lê a configuração, coleta dados básicos do PC e envia mensagens de teste.</p>
+              <p>O agente escuta comandos do Telegram e responde status deste computador.</p>
             </article>
             <article class="info-card">
               <h3>Instalação no boot</h3>
-              <p>Os scripts em Linux preparam `/opt/pc-control-center` e um serviço systemd.</p>
+              <p>Linux usa systemd, Windows usa Agendador de Tarefas e macOS está preparado para suporte futuro.</p>
             </article>
           </div>
         </section>
@@ -61,6 +61,7 @@
               <button type="submit">Salvar configuração</button>
               <button type="button" id="test-telegram" class="secondary">Testar conexão com Telegram</button>
             </div>
+            <ol id="setup-steps" class="setup-steps" aria-label="Etapas da configuração automática"></ol>
             <p id="config-summary" class="muted"></p>
             <p id="config-message" class="message" role="status"></p>
           </form>
@@ -74,10 +75,13 @@
           <div class="status-bar">
             <span id="connection-pill" class="pill disconnected">desconectado</span>
             <button id="refresh-status" class="secondary">Ver status do agente</button>
-            <button id="install-agent" class="secondary">Instalar agente</button>
+            <button id="repair-agent" class="secondary">Reparar instalação</button>
+            <button id="restart-agent" class="secondary">Reiniciar agente</button>
+            <button id="view-logs" class="secondary">Ver logs</button>
           </div>
           <dl id="status-list" class="status-list"></dl>
-          <p class="muted">O botão de instalação mostra o comando seguro para executar no terminal neste MVP.</p>
+          <pre id="logs-output" class="logs-output" hidden></pre>
+          <p class="muted">Quando o sistema pedir permissão de administrador, autorize para criar ou reparar o agente local.</p>
         </section>
       </section>
     </main>

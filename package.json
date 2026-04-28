@@ -1,7 +1,7 @@
 {
   "name": "pc-control-center",
   "version": "0.1.0",
-  "description": "Painel Electron para configurar monitoramento remoto via Telegram no Linux.",
+  "description": "Painel Electron para configurar agente local de monitoramento remoto via Telegram.",
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",

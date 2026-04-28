@@ -212,6 +212,45 @@ button:disabled {
   color: #a83232;
 }
 
+.setup-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-steps li {
+  display: grid;
+  grid-template-columns: minmax(180px, max-content) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid #deded2;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #fbfbf7;
+  color: #62685f;
+  font-weight: 800;
+}
+
+.setup-steps li span {
+  color: #62685f;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.setup-steps li.done {
+  border-color: #b7dfc2;
+  color: #1b4332;
+}
+
+.setup-steps li.failed {
+  border-color: #e7b1b1;
+  color: #a83232;
+}
+
 .pill {
   display: inline-flex;
   min-height: 36px;
@@ -265,6 +304,19 @@ button:disabled {
 .status-list dt:last-of-type,
 .status-list dd:last-of-type {
   border-bottom: 0;
+}
+
+.logs-output {
+  max-width: 900px;
+  max-height: 260px;
+  margin-top: 20px;
+  overflow: auto;
+  border: 1px solid #deded2;
+  border-radius: 8px;
+  padding: 14px;
+  background: #1f2522;
+  color: #f7f7f2;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 900px) {

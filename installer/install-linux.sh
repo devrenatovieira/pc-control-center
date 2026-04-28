@@ -5,7 +5,8 @@ APP_NAME="pc-control-center"
 INSTALL_DIR="/opt/${APP_NAME}"
 SERVICE_TEMPLATE="${APP_NAME}-agent@.service"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_USER="${PCC_TARGET_USER:-${SUDO_USER:-$USER}}"
+SERVICE_NAME="${APP_NAME}-agent@${TARGET_USER}.service"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Execute como root: sudo ./installer/install-linux.sh"
@@ -26,8 +27,9 @@ cp -a "${SOURCE_DIR}/package.json" "${INSTALL_DIR}/"
 install -m 644 "${SOURCE_DIR}/installer/pc-control-center-agent.service" "/etc/systemd/system/${SERVICE_TEMPLATE}"
 
 systemctl daemon-reload
-systemctl enable "${APP_NAME}-agent@${TARGET_USER}.service"
+systemctl enable "${SERVICE_NAME}"
+systemctl restart "${SERVICE_NAME}"
+systemctl is-active --quiet "${SERVICE_NAME}"
 
 echo "Instalação concluída em ${INSTALL_DIR}."
-echo "Serviço habilitado: ${APP_NAME}-agent@${TARGET_USER}.service"
-echo "Para iniciar agora: sudo systemctl start ${APP_NAME}-agent@${TARGET_USER}.service"
+echo "Serviço habilitado e iniciado: ${SERVICE_NAME}"

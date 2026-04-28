@@ -70,7 +70,7 @@ function validateChatId(chatId) {
   }
 }
 
-function telegramRequest(config, method, payload) {
+function telegramRequest(config, method, payload, options = {}) {
   const { botToken } = normalizeConfig(config);
   validateBotToken(botToken);
 
@@ -82,7 +82,7 @@ function telegramRequest(config, method, payload) {
     headers: {},
     agent: telegramHttpsAgent,
     family: 4,
-    timeout: 15000
+    timeout: options.timeout || 15000
   };
 
   if (payload) {
@@ -158,6 +158,29 @@ async function sendMessage(config, text) {
   }
 }
 
+async function getUpdates(config, options = {}) {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+
+  const payload = {
+    timeout: options.timeout ?? 25,
+    limit: options.limit ?? 20,
+    allowed_updates: ['message']
+  };
+
+  if (Number.isInteger(options.offset)) {
+    payload.offset = options.offset;
+  }
+
+  try {
+    return await telegramRequest(normalized, 'getUpdates', payload, {
+      timeout: (payload.timeout + 10) * 1000
+    });
+  } catch (error) {
+    throw new Error(`Falha no getUpdates: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
 async function testConnection(config, text) {
   const normalized = normalizeConfig(config);
   validateBotToken(normalized.botToken);
@@ -174,6 +197,7 @@ async function testConnection(config, text) {
 }
 
 module.exports = {
+  getUpdates,
   getMe,
   sendMessage,
   testConnection

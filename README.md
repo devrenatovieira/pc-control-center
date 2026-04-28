@@ -1,8 +1,8 @@
 # PC Control Center
 
-Painel desktop para configurar e instalar um agente Linux de monitoramento remoto via Telegram.
+Painel desktop para configurar e instalar automaticamente um agente local de monitoramento remoto via Telegram.
 
-O projeto combina um app Electron, um agente local em Node.js e scripts de instalação para systemd. O MVP permite salvar a configuração do Telegram, testar a conexão, visualizar informações básicas do PC e preparar o agente para iniciar com o sistema.
+O projeto combina um app Electron, um agente local em Node.js e instaladores para deixar o agente iniciando com o sistema. Depois que o usuário informa `BOT_TOKEN` e `CHAT_ID`, o app valida o Telegram, instala o agente, inicia o serviço/tarefa e mostra o status do PC.
 
 ## 📸 Demonstração
 
@@ -16,53 +16,52 @@ docs/demo.gif
 
 ### Requisitos
 
-- Linux com systemd.
 - Node.js 18 ou superior.
 - npm.
 - Uma conta no Telegram.
 - Um bot criado pelo BotFather.
 - O `CHAT_ID` do usuário, grupo ou canal que receberá as mensagens.
+- Linux com systemd ou Windows com Agendador de Tarefas. macOS será suportado em versão futura.
 
 ### Passo a passo
-
-Clone o projeto:
 
 ```bash
 git clone https://github.com/seu-usuario/pc-control-center.git
 cd pc-control-center
-```
-
-Instale as dependências:
-
-```bash
 npm install
-```
-
-## ▶️ Rodar Aplicação
-
-Inicie o app Electron:
-
-```bash
 npm start
 ```
 
-O app abre uma interface com:
+Depois que o app abrir, informe `BOT_TOKEN` e `CHAT_ID` na tela Telegram e clique em `Salvar configuração`.
 
-- tela inicial do sistema;
-- tela de configuração do Telegram;
-- status do PC atual;
-- botão para testar conexão com Telegram;
-- botão para consultar status do agente;
-- orientação para instalar o agente.
+O app executa automaticamente:
 
-## ⚙️ Configuração
+- validação do `BOT_TOKEN` e `CHAT_ID`;
+- `getMe` na API do Telegram;
+- `sendMessage` de teste;
+- instalação do agente;
+- inicialização do agente;
+- validação do PC conectado.
 
-Na tela `Telegram`, informe:
+No Linux, o app pode pedir autorização de administrador para criar o serviço systemd. Autorize o prompt do sistema; não é necessário digitar comandos manualmente.
 
-- `BOT_TOKEN`: token do bot criado no BotFather.
-- `CHAT_ID`: ID do chat que receberá as mensagens.
+## ▶️ Interface
 
-Depois clique em `Salvar configuração`.
+A interface mostra as etapas:
+
+- `Configuração salva`;
+- `Telegram validado`;
+- `Agente instalado`;
+- `Agente iniciado`;
+- `PC conectado`.
+
+Também há botões para:
+
+- reparar instalação;
+- reiniciar agente;
+- ver logs.
+
+## ⚙️ Configuração local
 
 A configuração local é salva em:
 
@@ -77,6 +76,8 @@ O arquivo é criado com permissão restrita:
 ```
 
 Depois de salvo, o token não é exibido novamente na tela.
+
+O arquivo `.gitignore` já bloqueia `.env`, `config.json`, `.config/`, logs e arquivos `*.token`.
 
 ## 🧪 Testes do Agente
 
@@ -102,32 +103,48 @@ O agente coleta:
 - RAM;
 - uso do disco da partição `/`.
 
-## 🛠️ Instalação Como Serviço
+## 🤖 Comandos Telegram
 
-Depois de configurar o Telegram pelo app, instale o agente como serviço systemd:
+Com o agente rodando, envie comandos pelo chat configurado:
 
-```bash
-sudo ./installer/install-linux.sh
+```text
+/start
+/help
+/status
 ```
 
-Inicie o serviço:
+O agente ignora mensagens de outros `chat_id`, salva o offset local e não responde mensagens antigas.
 
-```bash
-sudo systemctl start pc-control-center-agent@$USER.service
+## 🛠️ Instalação automática
+
+### Linux
+
+O app usa `installer/install-linux.sh` para:
+
+- copiar arquivos para `/opt/pc-control-center`;
+- registrar o serviço systemd;
+- habilitar o agente no boot;
+- iniciar o serviço;
+- validar `systemctl is-active`.
+
+Serviço:
+
+```text
+pc-control-center-agent@$USER.service
 ```
 
-Verifique o status:
+### Windows
 
-```bash
-systemctl status pc-control-center-agent@$USER.service
-```
+O app usa `installer/install-windows.ps1` para:
 
-O instalador:
+- criar a tarefa `PC Control Center Agent` no Agendador de Tarefas;
+- iniciar o agente no login;
+- iniciar a tarefa depois da configuração;
+- validar a tarefa criada.
 
-- copia arquivos para `/opt/pc-control-center`;
-- registra o serviço systemd;
-- habilita o agente para iniciar com o PC;
-- mantém o serviço rodando com o usuário atual.
+### macOS
+
+O app informa que a instalação automática no macOS estará disponível em breve.
 
 ## 🧹 Desinstalação
 
@@ -157,6 +174,7 @@ pc-control-center/
 │   │   ├── renderer.js
 │   │   └── styles.css
 │   └── src/
+│       ├── agent-manager.js
 │       └── config-store.js
 ├── agent/
 │   ├── agent.js
@@ -165,6 +183,7 @@ pc-control-center/
 │   └── telegram.js
 ├── installer/
 │   ├── install-linux.sh
+│   ├── install-windows.ps1
 │   ├── pc-control-center-agent.service
 │   └── uninstall-linux.sh
 ├── server/
@@ -183,7 +202,7 @@ O projeto foi pensado para evitar exposição acidental do token do Telegram.
 - O app e o agente não logam o token.
 - O MVP não configura sudoers.
 - O agente não executa comandos perigosos.
-- O instalador apenas copia arquivos e configura o serviço systemd.
+- O instalador copia arquivos e configura inicialização do agente, sem executar comandos remotos.
 
 Nunca compartilhe este arquivo publicamente:
 
@@ -229,6 +248,10 @@ Verifique a versão:
 node --version
 ```
 
+### Instalação automática pede senha
+
+No Linux, criar serviço systemd exige permissão de administrador. Autorize o prompt do sistema e use `Reparar instalação` se a primeira tentativa for interrompida.
+
 ### Serviço systemd não inicia
 
 Confira se a configuração existe para o usuário atual:
@@ -242,6 +265,8 @@ Depois verifique os logs:
 ```bash
 journalctl -u pc-control-center-agent@$USER.service -e
 ```
+
+Também é possível usar o botão `Ver logs` na interface.
 
 ## 🗺️ Roadmap
 

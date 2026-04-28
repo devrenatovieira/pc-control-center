@@ -9,9 +9,21 @@ const configSummary = document.querySelector('#config-summary');
 const configMessage = document.querySelector('#config-message');
 const testTelegramButton = document.querySelector('#test-telegram');
 const refreshStatusButton = document.querySelector('#refresh-status');
-const installAgentButton = document.querySelector('#install-agent');
+const repairAgentButton = document.querySelector('#repair-agent');
+const restartAgentButton = document.querySelector('#restart-agent');
+const viewLogsButton = document.querySelector('#view-logs');
 const connectionPill = document.querySelector('#connection-pill');
 const statusList = document.querySelector('#status-list');
+const setupSteps = document.querySelector('#setup-steps');
+const logsOutput = document.querySelector('#logs-output');
+
+const defaultSetupSteps = [
+  ['config', 'Configuração salva'],
+  ['telegram', 'Telegram validado'],
+  ['installed', 'Agente instalado'],
+  ['started', 'Agente iniciado'],
+  ['connected', 'PC conectado']
+];
 
 function setMessage(text, isError = false) {
   configMessage.textContent = text;
@@ -22,6 +34,30 @@ function getErrorMessage(error, fallback) {
   if (error?.message) return error.message;
   if (typeof error === 'string') return error;
   return fallback;
+}
+
+function renderSetupSteps(steps = []) {
+  const merged = defaultSetupSteps.map(([id, label]) => {
+    return steps.find((step) => step.id === id) || { id, label, ok: null, detail: '' };
+  });
+
+  const extraSteps = steps.filter((step) => !defaultSetupSteps.some(([id]) => id === step.id));
+  setupSteps.replaceChildren();
+
+  [...merged, ...extraSteps].forEach((step) => {
+    const item = document.createElement('li');
+    const state = step.ok === true ? 'done' : step.ok === false ? 'failed' : 'pending';
+    item.className = state;
+    item.textContent = `${state === 'done' ? '✓' : state === 'failed' ? '!' : '•'} ${step.label}`;
+
+    if (step.detail) {
+      const detail = document.createElement('span');
+      detail.textContent = step.detail;
+      item.append(detail);
+    }
+
+    setupSteps.append(item);
+  });
 }
 
 function showScreen(screenId) {
@@ -72,6 +108,21 @@ async function loadConfig() {
   }
 }
 
+async function runAutoSetup() {
+  renderSetupSteps([{ id: 'config', label: 'Configuração salva', ok: true }]);
+  setMessage('Validando Telegram e preparando o agente...');
+
+  const result = await api.runAutoSetup();
+  renderSetupSteps(result.steps || []);
+
+  if (!result.ok) {
+    throw new Error(result.error || result.install?.message || 'Falha na configuração automática.');
+  }
+
+  setMessage(`Automação concluída. PC conectado: ${result.hostname}.`);
+  return result;
+}
+
 async function refreshStatus() {
   refreshStatusButton.disabled = true;
   try {
@@ -98,8 +149,8 @@ configForm.addEventListener('submit', async (event) => {
 
     botTokenInput.value = '';
     await loadConfig();
+    await runAutoSetup();
     await refreshStatus();
-    setMessage('Configuração salva com permissão restrita.');
   } catch (error) {
     setMessage(error.message || 'Falha ao salvar configuração.', true);
   }
@@ -127,11 +178,52 @@ testTelegramButton.addEventListener('click', async () => {
 
 refreshStatusButton.addEventListener('click', refreshStatus);
 
-installAgentButton.addEventListener('click', () => {
-  showScreen('status');
-  navigator.clipboard?.writeText('sudo ./installer/install-linux.sh');
-  alert('Execute no terminal: sudo ./installer/install-linux.sh');
+repairAgentButton.addEventListener('click', async () => {
+  repairAgentButton.disabled = true;
+  setMessage('Reparando instalação...');
+
+  try {
+    const result = await api.repairAgent();
+    setMessage(result.ok ? result.message || 'Instalação reparada.' : result.message || 'Falha ao reparar instalação.', !result.ok);
+    await refreshStatus();
+  } catch (error) {
+    setMessage(getErrorMessage(error, 'Falha ao reparar instalação.'), true);
+  } finally {
+    repairAgentButton.disabled = false;
+  }
 });
+
+restartAgentButton.addEventListener('click', async () => {
+  restartAgentButton.disabled = true;
+  setMessage('Reiniciando agente...');
+
+  try {
+    const result = await api.restartAgent();
+    setMessage(result.ok ? result.message || 'Agente reiniciado.' : result.message || 'Falha ao reiniciar agente.', !result.ok);
+    await refreshStatus();
+  } catch (error) {
+    setMessage(getErrorMessage(error, 'Falha ao reiniciar agente.'), true);
+  } finally {
+    restartAgentButton.disabled = false;
+  }
+});
+
+viewLogsButton.addEventListener('click', async () => {
+  viewLogsButton.disabled = true;
+
+  try {
+    const result = await api.getAgentLogs();
+    logsOutput.hidden = false;
+    logsOutput.textContent = result.logs || 'Sem logs disponíveis.';
+    setMessage(result.ok ? 'Logs carregados.' : 'Falha ao carregar logs.', !result.ok);
+  } catch (error) {
+    setMessage(getErrorMessage(error, 'Falha ao carregar logs.'), true);
+  } finally {
+    viewLogsButton.disabled = false;
+  }
+});
+
+renderSetupSteps();
 
 loadConfig()
   .then(refreshStatus)
