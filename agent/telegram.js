@@ -1,4 +1,13 @@
+const dns = require('node:dns');
 const https = require('node:https');
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
+const telegramHttpsAgent = new https.Agent({
+  family: 4
+});
 
 function maskToken(token) {
   if (!token) return '';
@@ -71,6 +80,8 @@ function telegramRequest(config, method, payload) {
     path: `/bot${botToken}/${method}`,
     method: payload ? 'POST' : 'GET',
     headers: {},
+    agent: telegramHttpsAgent,
+    family: 4,
     timeout: 15000
   };
 
