@@ -441,6 +441,6 @@ Também é possível usar o botão `Ver logs` na interface.
 
 ## 👤 Autor
 
-Projeto criado por `rvzindx`.
+Projeto criado por `Renato Vieira`.
 
 Se usar este projeto como base, mantenha os tokens fora do repositório e revise as permissões antes de instalar em máquinas reais.
