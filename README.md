@@ -21,7 +21,7 @@ docs/demo.gif
 - Uma conta no Telegram.
 - Um bot criado pelo BotFather.
 - O `CHAT_ID` do usuário, grupo ou canal que receberá as mensagens.
-- Linux com systemd ou Windows com Agendador de Tarefas. macOS será suportado em versão futura.
+- Linux com systemd, Windows com Agendador de Tarefas ou macOS com LaunchAgent.
 
 ### Passo a passo
 
@@ -43,7 +43,7 @@ O app executa automaticamente:
 - inicialização do agente;
 - validação do PC conectado.
 
-No Linux, o app pode pedir autorização de administrador para criar o serviço systemd. Autorize o prompt do sistema; não é necessário digitar comandos manualmente.
+No Linux, o app pode pedir autorização de administrador para criar o serviço systemd e instalar sudoers específico. Autorize o prompt do sistema; não é necessário digitar comandos manualmente.
 
 ## ▶️ Interface
 
@@ -111,9 +111,102 @@ Com o agente rodando, envie comandos pelo chat configurado:
 /start
 /help
 /status
+/cpu
+/ram
+/disco
+/rede
+/ping
+/ip
+/internet
+/bateria
+/conexao
+/portas
+/processos
+/ssh
+/logs
+/uptime
+/swap
+/screenshot
+/webcam
+/bloquear
+/arquivo <tipo>
+/cmd <comando>
+/abrir <programa> [args]
+/desligar
+/reiniciar
+/suspender
+/confirmar <codigo>
+/volume
+/mudo
+/brilho
+/wifi on|off
+/bluetooth on|off
+/topcpu
+/topmem
+/limpeza
+/upgrade
 ```
 
-O agente ignora mensagens de outros `chat_id`, salva o offset local e não responde mensagens antigas.
+`/help` mostra o menu detalhado com botões clicáveis. O agente ignora mensagens de outros `chat_id`, salva o offset local e não responde mensagens antigas.
+
+Cada comando detecta `process.platform` e usa a implementação do sistema atual. Quando ainda não houver implementação segura, o agente responde:
+
+```text
+Comando ainda não disponível neste sistema.
+```
+
+### Arquivos disponíveis
+
+```text
+/arquivo monitoramento
+/arquivo alertas
+/arquivo ssh
+/arquivo portas
+/arquivo processos
+/arquivo bot
+/arquivo screenshot
+```
+
+Os logs do agente novo ficam em:
+
+```text
+~/.local/state/pc-control-center/logs/
+```
+
+### Ações sensíveis
+
+Estas ações exigem confirmação por código ou botão:
+
+- `/desligar`;
+- `/reiniciar`;
+- `/suspender`;
+- `/bloquear`;
+- `/limpeza`;
+- `/upgrade`;
+- `/cmd` quando o comando altera sistema, serviços, arquivos ou energia.
+
+O comando `/cmd` bloqueia `sudo` genérico. Sudo só é permitido pelos wrappers específicos instalados pelo projeto.
+
+## 🧭 Suporte por sistema
+
+| Comando | Linux | Windows | macOS |
+| --- | --- | --- | --- |
+| `/start`, `/help` | ✅ funciona | ✅ funciona | ✅ funciona |
+| `/status`, `/cpu`, `/ram`, `/disco`, `/uptime`, `/swap` | ✅ funciona | ✅ funciona | ✅ funciona |
+| `/rede`, `/ping`, `/ip`, `/internet`, `/conexao`, `/portas` | ✅ funciona | ✅ funciona | ✅ funciona |
+| `/processos`, `/topcpu`, `/topmem` | ✅ funciona | ✅ funciona | ✅ funciona |
+| `/ssh` | ✅ funciona | ❌ não disponível ainda | ❌ não disponível ainda |
+| `/logs` | ✅ funciona | ⚠️ parcial | ⚠️ parcial |
+| `/screenshot` | ✅ funciona | ❌ não disponível ainda | ✅ funciona |
+| `/webcam` | ✅ funciona | ❌ não disponível ainda | ❌ não disponível ainda |
+| `/arquivo <tipo>` | ✅ funciona | ❌ não disponível ainda | ❌ não disponível ainda |
+| `/cmd <comando>` | ⚠️ parcial | ⚠️ parcial | ⚠️ parcial |
+| `/abrir <programa> [args]` | ✅ funciona | ⚠️ parcial | ⚠️ parcial |
+| `/bloquear` | ✅ funciona | ✅ funciona | ✅ funciona |
+| `/desligar`, `/reiniciar` | ✅ funciona | ✅ funciona | ❌ não disponível ainda |
+| `/suspender` | ✅ funciona | ❌ não disponível ainda | ✅ funciona |
+| `/volume`, `/mudo`, `/brilho`, `/wifi`, `/bluetooth` | ⚠️ parcial | ❌ não disponível ainda | ❌ não disponível ainda |
+| `/limpeza`, `/upgrade` | ✅ funciona | ❌ não disponível ainda | ❌ não disponível ainda |
 
 ## 🛠️ Instalação automática
 
@@ -126,11 +219,42 @@ O app usa `installer/install-linux.sh` para:
 - habilitar o agente no boot;
 - iniciar o serviço;
 - validar `systemctl is-active`.
+- instalar wrappers sudo em `/opt/pc-control-center/agent/sudo_cmds/`;
+- instalar sudoers específico em `/etc/sudoers.d/pc-control-center`.
 
 Serviço:
 
 ```text
 pc-control-center-agent@$USER.service
+```
+
+Fallback manual, caso o prompt gráfico de autorização seja cancelado:
+
+```bash
+sudo env PCC_TARGET_USER=$USER bash installer/install-linux.sh
+sudo systemctl restart pc-control-center-agent@$USER.service
+```
+
+Para este computador, usando o usuário `rvzindx`:
+
+```bash
+sudo env PCC_TARGET_USER=rvzindx bash installer/install-linux.sh
+sudo systemctl restart pc-control-center-agent@rvzindx.service
+```
+
+### Permissões sudo
+
+O projeto não usa `NOPASSWD: ALL`. O instalador cria permissões restritas para estes wrappers:
+
+```text
+/opt/pc-control-center/agent/sudo_cmds/desligar.sh
+/opt/pc-control-center/agent/sudo_cmds/reiniciar.sh
+/opt/pc-control-center/agent/sudo_cmds/suspender.sh
+/opt/pc-control-center/agent/sudo_cmds/lock.sh
+/opt/pc-control-center/agent/sudo_cmds/reiniciar_bot.sh
+/opt/pc-control-center/agent/sudo_cmds/status_servicos.sh
+/opt/pc-control-center/agent/sudo_cmds/limpeza.sh
+/opt/pc-control-center/agent/sudo_cmds/upgrade.sh
 ```
 
 ### Windows
@@ -144,7 +268,12 @@ O app usa `installer/install-windows.ps1` para:
 
 ### macOS
 
-O app informa que a instalação automática no macOS estará disponível em breve.
+O app usa `installer/install-macos.sh` para criar um LaunchAgent do usuário atual.
+
+```bash
+bash installer/install-macos.sh
+launchctl list com.pc-control-center.agent
+```
 
 ## 🧹 Desinstalação
 
@@ -152,6 +281,18 @@ Remova o serviço systemd:
 
 ```bash
 sudo ./installer/uninstall-linux.sh
+```
+
+No Windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer\uninstall-windows.ps1
+```
+
+No macOS:
+
+```bash
+bash installer/uninstall-macos.sh
 ```
 
 O script remove o serviço, mas mantém os arquivos instalados em:
@@ -178,13 +319,29 @@ pc-control-center/
 │       └── config-store.js
 ├── agent/
 │   ├── agent.js
+│   ├── commands/
+│   │   └── index.js
 │   ├── config.js
+│   ├── platform/
+│   │   ├── linux.js
+│   │   ├── macos.js
+│   │   └── windows.js
+│   ├── screenshot.sh
+│   ├── security/
+│   │   └── confirmations.js
 │   ├── system-info.js
-│   └── telegram.js
+│   ├── sudo_cmds/
+│   ├── telegram.js
+│   ├── utils/
+│   └── webcam.sh
 ├── installer/
 │   ├── install-linux.sh
+│   ├── install-macos.sh
 │   ├── install-windows.ps1
 │   ├── pc-control-center-agent.service
+│   ├── pc-control-center-sudoers
+│   ├── uninstall-macos.sh
+│   ├── uninstall-windows.ps1
 │   └── uninstall-linux.sh
 ├── server/
 │   └── README.md
@@ -200,9 +357,12 @@ O projeto foi pensado para evitar exposição acidental do token do Telegram.
 - O `BOT_TOKEN` não deve ser publicado em issues, prints, logs ou commits.
 - O arquivo de configuração local usa permissão `600`.
 - O app e o agente não logam o token.
-- O MVP não configura sudoers.
-- O agente não executa comandos perigosos.
+- O agente não aceita senha do Ubuntu pelo Telegram.
+- O agente bloqueia `sudo` genérico em `/cmd`.
+- O agente recusa comandos muito perigosos, como formatação, wipe e remoção recursiva da raiz.
+- Ações sensíveis exigem confirmação temporária por código/botões.
 - O instalador copia arquivos e configura inicialização do agente, sem executar comandos remotos.
+- O sudoers gerado é específico para wrappers do projeto, nunca `NOPASSWD: ALL`.
 
 Nunca compartilhe este arquivo publicamente:
 

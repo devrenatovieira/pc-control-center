@@ -3,11 +3,14 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { readConfig, CONFIG_PATH } = require('./config');
+const commands = require('./commands');
 const telegram = require('./telegram');
 const systemInfo = require('./system-info');
+const { appendLog } = require('./utils/logger');
+const { ensureRuntimeDirs, statePath } = require('./utils/runtime');
 
-const STATE_DIR = process.env.PCC_STATE_DIR || path.join(os.homedir(), '.config', 'pc-control-center');
-const STATE_PATH = process.env.PCC_STATE_PATH || path.join(STATE_DIR, 'agent-state.json');
+const STATE_DIR = process.env.PCC_STATE_DIR || path.join(os.homedir(), '.local', 'state', 'pc-control-center');
+const STATE_PATH = process.env.PCC_STATE_PATH || statePath('agent-state.json');
 const POLL_TIMEOUT_SECONDS = Number(process.env.PCC_AGENT_POLL_TIMEOUT_SECONDS || 25);
 const RECONNECT_DELAY_MS = Number(process.env.PCC_AGENT_RECONNECT_DELAY_MS || 5000);
 
@@ -33,11 +36,8 @@ function sameChatId(messageChatId, configuredChatId) {
   return String(messageChatId) === String(configuredChatId);
 }
 
-function normalizeCommand(text) {
-  return String(text || '').trim().split(/\s+/)[0].split('@')[0].toLowerCase();
-}
-
 async function ensureStateDir() {
+  await ensureRuntimeDirs();
   await fs.mkdir(STATE_DIR, { recursive: true, mode: 0o700 });
   await fs.chmod(STATE_DIR, 0o700).catch(() => {});
 }
@@ -69,28 +69,6 @@ async function bootstrapOffset(config, state) {
   return offset;
 }
 
-async function handleCommand(config, message, command) {
-  if (command === '/start') {
-    await telegram.sendMessage(config, 'PC Control Center conectado. Envie /status para ver este computador ou /help para ajuda.');
-    return;
-  }
-
-  if (command === '/help') {
-    await telegram.sendMessage(config, 'Comandos disponíveis:\n/start - confirma a conexão\n/help - mostra esta ajuda\n/status - mostra o status deste PC');
-    return;
-  }
-
-  if (command === '/status') {
-    const info = await systemInfo.collect();
-    await telegram.sendMessage(config, ['Status do PC Control Center', systemInfo.formatStatus(info)].join('\n\n'));
-    return;
-  }
-
-  if (message.text?.startsWith('/')) {
-    await telegram.sendMessage(config, 'Comando não reconhecido. Envie /help para ver os comandos disponíveis.');
-  }
-}
-
 async function runDaemon() {
   const config = await readConfig();
   let state = await readState();
@@ -112,14 +90,31 @@ async function runDaemon() {
         await writeState(state);
 
         const message = update.message;
-        if (!message || !sameChatId(message.chat?.id, config.chatId)) {
+        const callbackQuery = update.callback_query;
+
+        if (message && !sameChatId(message.chat?.id, config.chatId)) {
           continue;
         }
 
-        await handleCommand(config, message, normalizeCommand(message.text));
+        if (callbackQuery && !sameChatId(callbackQuery.message?.chat?.id, config.chatId)) {
+          continue;
+        }
+
+        if (message?.text) {
+          if (message.text.trim().startsWith('/')) {
+            await commands.handleCommand(config, message.text);
+          } else {
+            await telegram.sendMessage(config, 'Envie /help para ver os comandos disponíveis.');
+          }
+        }
+
+        if (callbackQuery) {
+          await commands.handleCallback(config, callbackQuery);
+        }
       }
     } catch (error) {
       console.error(`Falha no loop do agente: ${error.message}`);
+      await appendLog('agent.log', `falha loop: ${error.message}`);
       await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
     }
   }

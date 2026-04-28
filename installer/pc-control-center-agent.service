@@ -7,6 +7,9 @@ Wants=network-online.target
 Type=simple
 User=%i
 Environment=PCC_CONFIG_PATH=/home/%i/.config/pc-control-center/config.json
+Environment=PCC_STATE_DIR=/home/%i/.local/state/pc-control-center
+Environment=PCC_LOG_DIR=/home/%i/.local/state/pc-control-center/logs
+Environment=PCC_SUDO_CMDS_DIR=/opt/pc-control-center/agent/sudo_cmds
 WorkingDirectory=/opt/pc-control-center
 ExecStart=/usr/bin/node /opt/pc-control-center/agent/agent.js --daemon
 Restart=on-failure

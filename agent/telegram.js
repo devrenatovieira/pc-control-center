@@ -1,5 +1,7 @@
 const dns = require('node:dns');
+const fs = require('node:fs');
 const https = require('node:https');
+const path = require('node:path');
 
 if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
@@ -135,6 +137,77 @@ function telegramRequest(config, method, payload, options = {}) {
   });
 }
 
+function telegramMultipartRequest(config, method, fields, fileField, filePath, options = {}) {
+  const { botToken } = normalizeConfig(config);
+  validateBotToken(botToken);
+
+  const boundary = `----pc-control-center-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const chunks = [];
+
+  for (const [key, value] of Object.entries(fields || {})) {
+    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`));
+  }
+
+  const filename = path.basename(filePath);
+  const fileBuffer = fs.readFileSync(filePath);
+  chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`));
+  chunks.push(fileBuffer);
+  chunks.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  const body = Buffer.concat(chunks);
+  const requestOptions = {
+    hostname: 'api.telegram.org',
+    path: `/bot${botToken}/${method}`,
+    method: 'POST',
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': body.length
+    },
+    agent: telegramHttpsAgent,
+    family: 4,
+    timeout: options.timeout || 30000
+  };
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(requestOptions, (response) => {
+      let data = '';
+
+      response.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      response.on('end', () => {
+        let parsed;
+
+        try {
+          parsed = data ? JSON.parse(data) : {};
+        } catch {
+          parsed = null;
+        }
+
+        if (response.statusCode >= 200 && response.statusCode < 300 && parsed?.ok !== false) {
+          resolve(parsed || { ok: true });
+          return;
+        }
+
+        const description = parsed?.description || data || 'sem detalhes';
+        reject(new Error(`Telegram ${method} retornou HTTP ${response.statusCode}: ${description}`));
+      });
+    });
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Tempo limite ao conectar no Telegram.'));
+    });
+
+    request.on('error', (error) => {
+      reject(new Error(flattenError(error, botToken)));
+    });
+
+    request.write(body);
+    request.end();
+  });
+}
+
 async function getMe(config) {
   try {
     return await telegramRequest(config, 'getMe');
@@ -158,6 +231,85 @@ async function sendMessage(config, text) {
   }
 }
 
+async function sendMessageWithMarkup(config, text, replyMarkup) {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+  validateChatId(normalized.chatId);
+
+  try {
+    return await telegramRequest(normalized, 'sendMessage', {
+      chat_id: normalized.chatId,
+      text,
+      disable_web_page_preview: true,
+      reply_markup: replyMarkup
+    });
+  } catch (error) {
+    throw new Error(`Falha no sendMessage: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
+async function editMessageText(config, messageId, text, replyMarkup) {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+  validateChatId(normalized.chatId);
+
+  try {
+    return await telegramRequest(normalized, 'editMessageText', {
+      chat_id: normalized.chatId,
+      message_id: messageId,
+      text,
+      disable_web_page_preview: true,
+      reply_markup: replyMarkup
+    });
+  } catch (error) {
+    throw new Error(`Falha no editMessageText: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
+async function answerCallbackQuery(config, callbackQueryId, text = '') {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+
+  try {
+    return await telegramRequest(normalized, 'answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      text
+    });
+  } catch (error) {
+    throw new Error(`Falha no answerCallbackQuery: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
+async function sendPhoto(config, filePath, caption = '') {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+  validateChatId(normalized.chatId);
+
+  try {
+    return await telegramMultipartRequest(normalized, 'sendPhoto', {
+      chat_id: normalized.chatId,
+      caption
+    }, 'photo', filePath);
+  } catch (error) {
+    throw new Error(`Falha no sendPhoto: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
+async function sendDocument(config, filePath, caption = '') {
+  const normalized = normalizeConfig(config);
+  validateBotToken(normalized.botToken);
+  validateChatId(normalized.chatId);
+
+  try {
+    return await telegramMultipartRequest(normalized, 'sendDocument', {
+      chat_id: normalized.chatId,
+      caption
+    }, 'document', filePath);
+  } catch (error) {
+    throw new Error(`Falha no sendDocument: ${flattenError(error, normalized.botToken)}`);
+  }
+}
+
 async function getUpdates(config, options = {}) {
   const normalized = normalizeConfig(config);
   validateBotToken(normalized.botToken);
@@ -165,7 +317,7 @@ async function getUpdates(config, options = {}) {
   const payload = {
     timeout: options.timeout ?? 25,
     limit: options.limit ?? 20,
-    allowed_updates: ['message']
+    allowed_updates: ['message', 'callback_query']
   };
 
   if (Number.isInteger(options.offset)) {
@@ -197,8 +349,13 @@ async function testConnection(config, text) {
 }
 
 module.exports = {
+  answerCallbackQuery,
+  editMessageText,
   getUpdates,
   getMe,
+  sendDocument,
   sendMessage,
+  sendMessageWithMarkup,
+  sendPhoto,
   testConnection
 };

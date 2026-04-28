@@ -7,8 +7,10 @@ const execFileAsync = util.promisify(execFile);
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const LINUX_INSTALLER = path.join(ROOT_DIR, 'installer', 'install-linux.sh');
 const WINDOWS_INSTALLER = path.join(ROOT_DIR, 'installer', 'install-windows.ps1');
+const MACOS_INSTALLER = path.join(ROOT_DIR, 'installer', 'install-macos.sh');
 const SERVICE_NAME = `pc-control-center-agent@${os.userInfo().username}.service`;
 const TASK_NAME = 'PC Control Center Agent';
+const MACOS_LABEL = 'com.pc-control-center.agent';
 
 async function run(command, args, options = {}) {
   return execFileAsync(command, args, {
@@ -47,6 +49,10 @@ function formatOutput(error) {
   return parts.join('\n');
 }
 
+function manualInstallCommand() {
+  return 'sudo env PCC_TARGET_USER=$USER bash installer/install-linux.sh';
+}
+
 async function installLinux() {
   const envArgs = ['env', `PCC_TARGET_USER=${os.userInfo().username}`, 'bash', LINUX_INSTALLER];
 
@@ -57,13 +63,16 @@ async function installLinux() {
       await run('sudo', ['-n', 'env', `PCC_TARGET_USER=${os.userInfo().username}`, 'bash', LINUX_INSTALLER], { timeout: 180000 });
     }
   } catch (error) {
+    const output = formatOutput(error);
+    const canceled = /cancel|dismiss|not authorized|authentication|pkexec/i.test(output);
     return {
       ok: false,
       needsPrivilege: true,
       message: [
         'A instalação do serviço systemd precisa de permissão de administrador.',
-        'Autorize o prompt de senha do sistema e tente "Reparar instalação".',
-        formatOutput(error)
+        canceled ? 'O prompt de autorização foi cancelado ou recusado.' : 'Autorize o prompt de senha do sistema e tente "Reparar instalação".',
+        `Fallback manual: ${manualInstallCommand()}`,
+        output
       ].join('\n')
     };
   }
@@ -104,7 +113,7 @@ async function restartLinux() {
   } catch (error) {
     return {
       ok: false,
-      message: `Não foi possível reiniciar o serviço. Autorize o prompt do sistema e tente novamente.\n${formatOutput(error)}`
+      message: `Não foi possível reiniciar o serviço. Autorize o prompt do sistema e tente novamente.\nFallback manual: ${manualInstallCommand()}\n${formatOutput(error)}`
     };
   }
 
@@ -133,6 +142,39 @@ async function installWindows() {
   }
 
   return validateWindows();
+}
+
+async function installMacos() {
+  try {
+    await run('bash', [MACOS_INSTALLER], { timeout: 120000 });
+    return validateMacos();
+  } catch (error) {
+    return {
+      ok: false,
+      message: `Falha ao instalar LaunchAgent no macOS: ${formatOutput(error)}`
+    };
+  }
+}
+
+async function validateMacos() {
+  try {
+    await run('launchctl', ['list', MACOS_LABEL], { timeout: 15000 });
+    return {
+      ok: true,
+      installed: true,
+      running: true,
+      taskName: MACOS_LABEL,
+      message: `LaunchAgent "${MACOS_LABEL}" carregado.`
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      installed: false,
+      running: false,
+      taskName: MACOS_LABEL,
+      message: `Não foi possível validar o LaunchAgent "${MACOS_LABEL}": ${formatOutput(error)}`
+    };
+  }
 }
 
 async function validateWindows() {
@@ -175,13 +217,7 @@ async function logsWindows() {
 async function installAgent() {
   if (process.platform === 'linux') return installLinux();
   if (process.platform === 'win32') return installWindows();
-  if (process.platform === 'darwin') {
-    return {
-      ok: false,
-      comingSoon: true,
-      message: 'Instalação automática no macOS estará disponível em breve.'
-    };
-  }
+  if (process.platform === 'darwin') return installMacos();
 
   return { ok: false, message: `Sistema operacional não suportado: ${process.platform}.` };
 }
@@ -189,19 +225,31 @@ async function installAgent() {
 async function restartAgent() {
   if (process.platform === 'linux') return restartLinux();
   if (process.platform === 'win32') return restartWindows();
-  return { ok: false, message: 'Reinício automático disponível apenas em Linux e Windows.' };
+  if (process.platform === 'darwin') {
+    try {
+      await run('launchctl', ['kickstart', '-k', `gui/${process.getuid()}/${MACOS_LABEL}`], { timeout: 30000 });
+      return validateMacos();
+    } catch (error) {
+      return { ok: false, message: `Não foi possível reiniciar o LaunchAgent: ${formatOutput(error)}` };
+    }
+  }
+  return { ok: false, message: 'Reinício automático não disponível neste sistema.' };
 }
 
 async function getLogs() {
   if (process.platform === 'linux') return logsLinux();
   if (process.platform === 'win32') return logsWindows();
-  return { ok: false, logs: 'Logs automáticos disponíveis apenas em Linux e Windows.' };
+  if (process.platform === 'darwin') {
+    return { ok: true, logs: `Logs em ~/.local/state/pc-control-center/logs/ e status via launchctl list ${MACOS_LABEL}.` };
+  }
+  return { ok: false, logs: 'Logs automáticos não disponíveis neste sistema.' };
 }
 
 module.exports = {
   getLogs,
   installAgent,
   restartAgent,
+  validateMacos,
   validateLinux,
   validateWindows
 };

@@ -13,6 +13,7 @@ fi
 
 systemctl disable --now "${APP_NAME}-agent@${TARGET_USER}.service" 2>/dev/null || true
 rm -f "/etc/systemd/system/${SERVICE_TEMPLATE}"
+rm -f "/etc/sudoers.d/${APP_NAME}"
 systemctl daemon-reload
 
 echo "Serviço removido."
