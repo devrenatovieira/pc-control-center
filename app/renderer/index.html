@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC Control Center</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">MVP Linux</p>
+          <h1>PC Control Center</h1>
+        </div>
+        <nav class="nav" aria-label="Seções">
+          <button class="nav-button active" data-screen="welcome">Início</button>
+          <button class="nav-button" data-screen="config">Telegram</button>
+          <button class="nav-button" data-screen="status">Status do PC</button>
+        </nav>
+        <p class="sidebar-note">Estrutura preparada para gerenciar vários PCs em versões futuras.</p>
+      </aside>
+
+      <section class="content">
+        <section id="welcome" class="screen active">
+          <div class="section-heading">
+            <p class="eyebrow">Monitoramento remoto</p>
+            <h2>Configure o agente Linux e receba alertas pelo Telegram.</h2>
+          </div>
+          <div class="info-grid">
+            <article class="info-card">
+              <h3>Configuração segura</h3>
+              <p>O token é salvo localmente com permissão restrita e fica mascarado após o salvamento.</p>
+            </article>
+            <article class="info-card">
+              <h3>Agente local</h3>
+              <p>O agente lê a configuração, coleta dados básicos do PC e envia mensagens de teste.</p>
+            </article>
+            <article class="info-card">
+              <h3>Instalação no boot</h3>
+              <p>Os scripts em Linux preparam `/opt/pc-control-center` e um serviço systemd.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="config" class="screen">
+          <div class="section-heading">
+            <p class="eyebrow">Telegram</p>
+            <h2>Configuração do bot</h2>
+          </div>
+          <form id="config-form" class="panel">
+            <label>
+              BOT_TOKEN
+              <input id="bot-token" type="password" autocomplete="off" placeholder="Cole o token do BotFather" />
+            </label>
+            <label>
+              CHAT_ID
+              <input id="chat-id" type="text" autocomplete="off" placeholder="Ex.: 123456789" />
+            </label>
+            <div class="actions">
+              <button type="submit">Salvar configuração</button>
+              <button type="button" id="test-telegram" class="secondary">Testar conexão com Telegram</button>
+            </div>
+            <p id="config-summary" class="muted"></p>
+            <p id="config-message" class="message" role="status"></p>
+          </form>
+        </section>
+
+        <section id="status" class="screen">
+          <div class="section-heading">
+            <p class="eyebrow">Este computador</p>
+            <h2>Status do agente</h2>
+          </div>
+          <div class="status-bar">
+            <span id="connection-pill" class="pill disconnected">desconectado</span>
+            <button id="refresh-status" class="secondary">Ver status do agente</button>
+            <button id="install-agent" class="secondary">Instalar agente</button>
+          </div>
+          <dl id="status-list" class="status-list"></dl>
+          <p class="muted">O botão de instalação mostra o comando seguro para executar no terminal neste MVP.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

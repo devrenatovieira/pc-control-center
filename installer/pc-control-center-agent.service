@@ -1,0 +1,16 @@
+[Unit]
+Description=PC Control Center Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+Environment=PCC_CONFIG_PATH=/home/%i/.config/pc-control-center/config.json
+WorkingDirectory=/opt/pc-control-center
+ExecStart=/usr/bin/node /opt/pc-control-center/agent/agent.js --daemon
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
