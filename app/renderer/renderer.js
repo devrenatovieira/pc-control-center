@@ -18,6 +18,12 @@ function setMessage(text, isError = false) {
   configMessage.classList.toggle('error', isError);
 }
 
+function getErrorMessage(error, fallback) {
+  if (error?.message) return error.message;
+  if (typeof error === 'string') return error;
+  return fallback;
+}
+
 function showScreen(screenId) {
   navButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.screen === screenId);
@@ -105,10 +111,15 @@ testTelegramButton.addEventListener('click', async () => {
 
   try {
     const result = await api.testTelegram();
-    setMessage(`Mensagem enviada pelo PC ${result.hostname}.`);
+    if (!result?.ok) {
+      throw new Error(result?.error || 'Falha ao testar Telegram.');
+    }
+
+    const botInfo = result.botUsername ? ` Bot: @${result.botUsername}.` : '';
+    setMessage(`Conexão com Telegram validada e mensagem enviada pelo PC ${result.hostname}.${botInfo}`);
     await refreshStatus();
   } catch (error) {
-    setMessage(error.message || 'Falha ao testar Telegram.', true);
+    setMessage(getErrorMessage(error, 'Falha ao testar Telegram.'), true);
   } finally {
     testTelegramButton.disabled = false;
   }

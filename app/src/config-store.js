@@ -11,14 +11,25 @@ function maskToken(token) {
   return `${token.slice(0, 4)}...${token.slice(-4)}`;
 }
 
+function pickConfigValue(payload, keys) {
+  for (const key of keys) {
+    if (payload?.[key] !== undefined && payload[key] !== null) {
+      const value = String(payload[key]).trim();
+      if (value) return value;
+    }
+  }
+
+  return '';
+}
+
 async function ensureConfigDir() {
   await fs.mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
   await fs.chmod(CONFIG_DIR, 0o700);
 }
 
 function validateConfig(payload) {
-  const botToken = String(payload?.botToken || '').trim();
-  const chatId = String(payload?.chatId || '').trim();
+  const botToken = String(pickConfigValue(payload, ['botToken', 'bot_token', 'BOT_TOKEN'])).trim();
+  const chatId = String(pickConfigValue(payload, ['chatId', 'chat_id', 'CHAT_ID'])).trim();
 
   if (!botToken) {
     throw new Error('BOT_TOKEN é obrigatório.');

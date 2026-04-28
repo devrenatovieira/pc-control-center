@@ -47,17 +47,24 @@ ipcMain.handle('config:save', async (_event, payload) => {
 });
 
 ipcMain.handle('telegram:test', async () => {
-  const config = await configStore.readConfig();
-  const info = await systemInfo.collect();
-  const message = [
-    'Teste do PC Control Center',
-    `PC: ${info.hostname}`,
-    `SO: ${info.platform} ${info.release}`,
-    `Status: conectado`
-  ].join('\n');
+  try {
+    const config = await configStore.readConfig();
+    const info = await systemInfo.collect();
+    const message = [
+      'Teste do PC Control Center',
+      `PC: ${info.hostname}`,
+      `SO: ${info.platform} ${info.release}`,
+      `Status: conectado`
+    ].join('\n');
 
-  await telegram.sendMessage(config, message);
-  return { ok: true, hostname: info.hostname };
+    const result = await telegram.testConnection(config, message);
+    return { ok: true, hostname: info.hostname, botUsername: result.botUsername };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message || 'Falha ao testar conexão com Telegram.'
+    };
+  }
 });
 
 ipcMain.handle('pc:status', async () => {
