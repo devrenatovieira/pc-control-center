@@ -1,4 +1,4 @@
-# PC Control Center
+# PC Control Center - ATENÇÃO PROJETO CONTÉM ALGUNS ERROS NÃO RESOLVIDOS
 
 Painel desktop para configurar e instalar automaticamente um agente local de monitoramento remoto via Telegram.
 
@@ -26,7 +26,7 @@ docs/demo.gif
 ### Passo a passo
 
 ```bash
-git clone https://github.com/seu-usuario/pc-control-center.git
+git clone https://github.com/devrenatovieira/pc-control-center.git
 cd pc-control-center
 npm install
 npm start
